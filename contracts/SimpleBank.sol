@@ -32,11 +32,11 @@ contract SimpleBank {
     event LogEnrolled(address accountAddress);
 
     // Add 2 arguments for this event, an accountAddress and an amount
-    event LogDepositMade(address accountAddress, uint amount);
+    event LogDepositMade(address indexed accountAddress, uint amount);
 
     // Create an event called LogWithdrawal
     // Hint: it should take 3 arguments: an accountAddress, withdrawAmount and a newBalance 
-    event LogWithdrawal(address accountAddress, uint withdrawAmount, uint newBalance);
+    event LogWithdrawal(address indexed accountAddress, uint withdrawAmount, uint newBalance);
 
     /* Functions
      */
@@ -46,8 +46,12 @@ contract SimpleBank {
     // Typically, called when invalid data is sent
     // Added so ether sent to this contract is reverted if the contract fails
     // otherwise, the sender's money is transferred to contract
-    function () external payable {
+    fallback() external payable {
         revert();
+    }
+
+    receive() external payable {
+      revert();
     }
 
     /// @notice Get balance
@@ -64,9 +68,12 @@ contract SimpleBank {
     // Emit the appropriate event
     function enroll() public returns (bool){
       // 1. enroll of the sender of this transaction
-      if(enrolled[msg.sender] != true) {
-        enrolled[msg.sender] = true;
-      }
+      require(!enrolled[msg.sender], "Already enrolled");
+
+      enrolled[msg.sender] = true;
+      
+      emit LogEnrolled(msg.sender);
+      
       return true;
     }
 
@@ -83,7 +90,8 @@ contract SimpleBank {
       // 4. Emit the appropriate event associated with this function
 
       // 5. return the balance of sndr of this transaction
-      require(enrolled[msg.sender] == true, "Users should be enrolled before they can make deposits");
+      require(enrolled[msg.sender], "Users should be enrolled before they can make deposits");
+      require(msg.value > 0, "The amount is zero");
 
       balances[msg.sender] += msg.value;
 
@@ -108,12 +116,14 @@ contract SimpleBank {
       //    sender's balance
 
       // 3. Emit the appropriate event for this message
-      require(balances[msg.sender] >= withdrawAmount, "The withdrawAmount is major than the balance");
+      require(withdrawAmount > 0 && balances[msg.sender] >= withdrawAmount, "The amount to be withdraw is out of range");
       
       balances[msg.sender] -= withdrawAmount;
       
-      msg.sender.transfer(withdrawAmount);
+      payable(msg.sender).transfer(withdrawAmount);
 
       emit LogWithdrawal(msg.sender, withdrawAmount, balances[msg.sender]);
+
+      return balances[msg.sender];
     }
 }
